@@ -4,7 +4,7 @@ import * as anchor from '@project-serum/anchor';
 import { Program } from '@project-serum/anchor';
 import { Solpat } from '../../target/types/solpat';
 import { TOKEN_PROGRAM_ID, Token } from '@solana/spl-token';
-import NodeWallet from '@project-serum/anchor/dist/cjs/provider';
+// import NodeWallet from '@project-serum/anchor/dist/cjs/provider';
 import { PublicKey, Keypair, clusterApiUrl, SystemProgram, Transaction, Connection, Commitment } from '@solana/web3.js';
 // import idl from './idl.json';
 const idl = require('./idl.json');
@@ -52,6 +52,10 @@ async function createPool() {
   );
   let pool_account_pda = _pool_account_pda;
   console.log("pool_account_pda", pool_account_pda.toBase58());
+  const [token_vault_pda, _token_vault_bump] = await PublicKey.findProgramAddress(
+    [Buffer.from(anchor.utils.bytes.utf8.encode("token")), pool_account_pda.toBuffer()],
+    program.programId
+  );
 
   const tx = await program.rpc.createPool(
     pool_id,
@@ -61,6 +65,7 @@ async function createPool() {
       accounts: {
         authority: wallet.publicKey,
         pool: pool_account_pda,
+        token_vault: token_vault_pda,
         feedAccount: AggregatorPublicKey,
         systemProgram: anchor.web3.SystemProgram.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
@@ -98,17 +103,11 @@ async function startRound() {
     program.programId
   );
 
-  const [token_vault_pda, _token_vault_bump] = await PublicKey.findProgramAddress(
-    [Buffer.from(anchor.utils.bytes.utf8.encode("token")), next_round_pda.toBuffer()],
-    program.programId
-  );
-  // Add your test here.
   const tx = await program.rpc.startRound(
     {
       accounts: {
         authority: wallet.publicKey,
         pool: pool_account_pda,
-        tokenVault: token_vault_pda,
         nextRound: next_round_pda,
         systemProgram: anchor.web3.SystemProgram.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
@@ -140,7 +139,7 @@ async function betRound() {
   );
 
   const [token_vault_pda, _token_vault_bump] = await PublicKey.findProgramAddress(
-    [Buffer.from(anchor.utils.bytes.utf8.encode("token")), cur_round_pda.toBuffer()],
+    [Buffer.from(anchor.utils.bytes.utf8.encode("token")), pool_account_pda.toBuffer()],
     program.programId
   );
 
@@ -151,10 +150,12 @@ async function betRound() {
 
   const tx = await program.rpc.bet(
     new anchor.BN(10000), // bet amount
+    poolAccount2.nextRound.subn(1),
     0,
     {
       accounts: {
         authority: wallet.publicKey,
+        pool: pool_account_pda,
         tokenVault: token_vault_pda,
         tokenUser: token_user,
         curRound: cur_round_pda,
@@ -198,17 +199,11 @@ async function lockRound() {
     program.programId
   );
 
-  const [token_vault_pda, _token_vault_bump] = await PublicKey.findProgramAddress(
-    [Buffer.from(anchor.utils.bytes.utf8.encode("token")), next_round_pda.toBuffer()],
-    program.programId
-  );
-  // Add your test here.
   const tx = await program.rpc.lockRound(
     {
       accounts: {
         authority: wallet.publicKey,
         pool: pool_account_pda,
-        tokenVault: token_vault_pda,
         nextRound: next_round_pda,
         curRound: cur_round_pda,
         feedAccount: AggregatorPublicKey,
@@ -253,17 +248,11 @@ async function processRound() {
     program.programId
   );
 
-  const [token_vault_pda, _token_vault_bump] = await PublicKey.findProgramAddress(
-    [Buffer.from(anchor.utils.bytes.utf8.encode("token")), next_round_pda.toBuffer()],
-    program.programId
-  );
-  // Add your test here.
   const tx = await program.rpc.processRound(
     {
       accounts: {
         authority: wallet.publicKey,
         pool: pool_account_pda,
-        tokenVault: token_vault_pda,
         nextRound: next_round_pda,
         curRound: cur_round_pda,
         preRound: pre_round_pda,
@@ -281,7 +270,7 @@ async function processRound() {
   return "OK"
 }
 
-async function claimRound() {
+async function claimRound(round_id) {
   //可以将round id记录在后台中，减少链查询
   const [_pool_account_pda, _pool_account_bump] = await PublicKey.findProgramAddress(
     [pool_id.toBuffer("be", 8)],
@@ -290,12 +279,12 @@ async function claimRound() {
   let pool_account_pda = _pool_account_pda;
 
   const [claim_round_pda, _claim_round_bump] = await PublicKey.findProgramAddress(
-    [Buffer.from(anchor.utils.bytes.utf8.encode("round")), pool_account_pda.toBuffer(), new anchor.BN(2).toBuffer("be", 8)],
+    [Buffer.from(anchor.utils.bytes.utf8.encode("round")), pool_account_pda.toBuffer(), new anchor.BN(round_id).toBuffer("be", 8)],
     program.programId
   );
 
   const [token_vault_pda, _token_vault_bump] = await PublicKey.findProgramAddress(
-    [Buffer.from(anchor.utils.bytes.utf8.encode("token")), claim_round_pda.toBuffer()],
+    [Buffer.from(anchor.utils.bytes.utf8.encode("token")), pool_account_pda.toBuffer()],
     program.programId
   );
 
@@ -305,6 +294,7 @@ async function claimRound() {
   );
 
   const tx = await program.rpc.claim(
+    new anchor.BN(round_id),
     {
       accounts: {
         authority: wallet.publicKey,
@@ -324,7 +314,7 @@ async function claimRound() {
   return "OK";
 }
 
-async function takeFeeRound() {
+async function takeFeeRound(round_id) {
   //可以将round id记录在后台中，减少链查询
   const [_pool_account_pda, _pool_account_bump] = await PublicKey.findProgramAddress(
     [pool_id.toBuffer("be", 8)],
@@ -332,17 +322,17 @@ async function takeFeeRound() {
   );
   let pool_account_pda = _pool_account_pda;
   const [claim_round_pda, _claim_round_bump] = await PublicKey.findProgramAddress(
-    [Buffer.from(anchor.utils.bytes.utf8.encode("round")), pool_account_pda.toBuffer(), new anchor.BN(2).toBuffer("be", 8)],
+    [Buffer.from(anchor.utils.bytes.utf8.encode("round")), pool_account_pda.toBuffer(), new anchor.BN(round_id).toBuffer("be", 8)],
     program.programId
   );
 
   const [token_vault_pda, _token_vault_bump] = await PublicKey.findProgramAddress(
-    [Buffer.from(anchor.utils.bytes.utf8.encode("token")), claim_round_pda.toBuffer()],
+    [Buffer.from(anchor.utils.bytes.utf8.encode("token")), pool_account_pda.toBuffer()],
     program.programId
   );
 
   const tx = await program.rpc.takeFee(
-    new anchor.BN(2), // round id
+    new anchor.BN(round_id), // round id
     {
       accounts: {
         authority: wallet.publicKey,
@@ -364,7 +354,7 @@ async function takeFeeRound() {
   return "OK";
 }
 
-async function freeRound() {
+async function freeRound(round_id) {
   //可以将round id记录在后台中，减少链查询
   const [_pool_account_pda, _pool_account_bump] = await PublicKey.findProgramAddress(
     [pool_id.toBuffer("be", 8)],
@@ -373,17 +363,17 @@ async function freeRound() {
   let pool_account_pda = _pool_account_pda;
   let poolAccount2 = await program.account.pool.fetch(pool_account_pda);
   const [claim_round_pda, _claim_round_bump] = await PublicKey.findProgramAddress(
-    [Buffer.from(anchor.utils.bytes.utf8.encode("round")), pool_account_pda.toBuffer(), poolAccount2.nextRound.subn(3).toBuffer("be", 8)],
+    [Buffer.from(anchor.utils.bytes.utf8.encode("round")), pool_account_pda.toBuffer(), new anchor.BN(round_id).toBuffer("be", 8)],
     program.programId
   );
 
   const [token_vault_pda, _token_vault_bump] = await PublicKey.findProgramAddress(
-    [Buffer.from(anchor.utils.bytes.utf8.encode("token")), claim_round_pda.toBuffer()],
+    [Buffer.from(anchor.utils.bytes.utf8.encode("token")), pool_account_pda.toBuffer()],
     program.programId
   );
 
   const tx = await program.rpc.freeRound(
-    poolAccount2.nextRound.subn(3), // round id
+    new anchor.BN(round_id), // round id
     {
       accounts: {
         authority: wallet.publicKey,
@@ -394,6 +384,7 @@ async function freeRound() {
         systemProgram: anchor.web3.SystemProgram.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
         rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+        clock: anchor.web3.SYSVAR_CLOCK_PUBKEY,
       }
     });
   console.log("Your transaction signature", tx);

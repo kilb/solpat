@@ -11,7 +11,7 @@ solpat = "Predi95J5ikTsG1v1ccrg8eDBUQaUr5Nkw7X4U5Fzbi"
 url = "https://anchor.projectserum.com"
 
 [provider]
-cluster = "mainnet"
+cluster = "devnet"
 wallet = "/home/ke/.config/solana/id.json"
 
 [scripts]

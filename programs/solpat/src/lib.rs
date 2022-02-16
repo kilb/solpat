@@ -1,13 +1,18 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, CloseAccount, Mint, Token, TokenAccount, Transfer};
-use pyth_client::{load_price};
+use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
+use pyth_client::load_price;
 
-declare_id!("Predi95J5ikTsG1v1ccrg8eDBUQaUr5Nkw7X4U5Fzbi");
+declare_id!("PrediCRGdC1S7TwJWrLbZtcv3qLm3AeQHZ8c4vFpWd9");
 
 #[program]
 pub mod solpat {
     use super::*;
-    pub fn create_pool(ctx: Context<CreatePool>, pool_id: u64, duration: i64, fee_rate: u64) -> ProgramResult {
+    pub fn create_pool(
+        ctx: Context<CreatePool>,
+        pool_id: u64,
+        duration: i64,
+        fee_rate: u64,
+    ) -> ProgramResult {
         let pool = &mut ctx.accounts.pool;
         pool.pool_id = pool_id;
         pool.authority = ctx.accounts.authority.key();
@@ -26,11 +31,10 @@ pub mod solpat {
         let next_round = &mut ctx.accounts.next_round;
         let pool = &mut ctx.accounts.pool;
         // start new round
-        next_round.bonus = 0;
         next_round.start_time = now_ts;
         next_round.deposit_up = 0;
         next_round.deposit_down = 0;
-        next_round.accounts_amount = 0;
+        next_round.take_amount = 0;
         next_round.status = 0;
         pool.next_round += 1;
         pool.latest_time = now_ts;
@@ -42,7 +46,11 @@ pub mod solpat {
     }
 
     pub fn lock_round(ctx: Context<LockRound>) -> ProgramResult {
-        let price = load_price(&ctx.accounts.feed_account.try_borrow_data()?).unwrap().get_current_price().unwrap().price;
+        let price = load_price(&ctx.accounts.feed_account.try_borrow_data()?)
+            .unwrap()
+            .get_current_price()
+            .unwrap()
+            .price;
         let now_ts = ctx.accounts.clock.unix_timestamp;
         let cur_round = &mut ctx.accounts.cur_round;
         let next_round = &mut ctx.accounts.next_round;
@@ -52,11 +60,10 @@ pub mod solpat {
         cur_round.lock_time = now_ts;
         cur_round.lock_price = price;
         // start new round
-        next_round.bonus = 0;
         next_round.start_time = now_ts;
         next_round.deposit_up = 0;
         next_round.deposit_down = 0;
-        next_round.accounts_amount = 0;
+        next_round.take_amount = 0;
         next_round.status = 0;
         pool.next_round += 1;
         pool.latest_time = now_ts;
@@ -69,7 +76,11 @@ pub mod solpat {
     }
 
     pub fn process_round(ctx: Context<ProcessRound>) -> ProgramResult {
-        let price = load_price(&ctx.accounts.feed_account.try_borrow_data()?).unwrap().get_current_price().unwrap().price;
+        let price = load_price(&ctx.accounts.feed_account.try_borrow_data()?)
+            .unwrap()
+            .get_current_price()
+            .unwrap()
+            .price;
         let now_ts = ctx.accounts.clock.unix_timestamp;
         let pre_round = &mut ctx.accounts.pre_round;
         let cur_round = &mut ctx.accounts.cur_round;
@@ -77,19 +88,16 @@ pub mod solpat {
         let pool = &mut ctx.accounts.pool;
         // close pre round
         pre_round.status = 2;
-        pre_round.closed_time = now_ts;
         pre_round.closed_price = price;
-        pre_round.bonus = (pre_round.deposit_down + pre_round.deposit_up) * (10000 - pool.fee_rate) / 10000;
         // lock cur round
         cur_round.status = 1;
         cur_round.lock_time = now_ts;
         cur_round.lock_price = price;
         // start new round
-        next_round.bonus = 0;
         next_round.start_time = now_ts;
         next_round.deposit_up = 0;
         next_round.deposit_down = 0;
-        next_round.accounts_amount = 0;
+        next_round.take_amount = 0;
         next_round.status = 0;
         pool.next_round += 1;
         pool.latest_time = now_ts;
@@ -102,16 +110,17 @@ pub mod solpat {
     }
 
     pub fn pause_round(ctx: Context<PauseRound>) -> ProgramResult {
-        let price = load_price(&ctx.accounts.feed_account.try_borrow_data()?).unwrap().get_current_price().unwrap().price;
+        let price = load_price(&ctx.accounts.feed_account.try_borrow_data()?)
+            .unwrap()
+            .get_current_price()
+            .unwrap()
+            .price;
         let now_ts = ctx.accounts.clock.unix_timestamp;
         let pre_round = &mut ctx.accounts.pre_round;
         let cur_round = &mut ctx.accounts.cur_round;
-        let pool = &mut ctx.accounts.pool;
         // close pre round
         pre_round.status = 2;
-        pre_round.closed_time = now_ts;
         pre_round.closed_price = price;
-        pre_round.bonus = (pre_round.deposit_down + pre_round.deposit_up) * (10000 - pool.fee_rate) / 10000;
         // lock cur round
         cur_round.status = 1;
         cur_round.lock_time = now_ts;
@@ -120,19 +129,19 @@ pub mod solpat {
     }
 
     pub fn close_round(ctx: Context<CloseRound>) -> ProgramResult {
-        let price = load_price(&ctx.accounts.feed_account.try_borrow_data()?).unwrap().get_current_price().unwrap().price;
-        let now_ts = ctx.accounts.clock.unix_timestamp;
+        let price = load_price(&ctx.accounts.feed_account.try_borrow_data()?)
+            .unwrap()
+            .get_current_price()
+            .unwrap()
+            .price;
         let cur_round = &mut ctx.accounts.cur_round;
-        let pool = &mut ctx.accounts.pool;
         // close pre round
         cur_round.status = 2;
-        cur_round.closed_time = now_ts;
         cur_round.closed_price = price;
-        cur_round.bonus = (cur_round.deposit_down + cur_round.deposit_up) * (10000 - pool.fee_rate) / 10000;
         Ok(())
     }
 
-    pub fn bet(ctx: Context<Bet>, bet_amount: u64, bet_type: u8) -> ProgramResult {
+    pub fn bet(ctx: Context<Bet>, bet_amount: u64, round_id: u64, bet_type: u8) -> ProgramResult {
         let cur_round = &mut ctx.accounts.cur_round;
         let user_bet = &mut ctx.accounts.user_bet;
         if bet_type == 0 {
@@ -142,41 +151,42 @@ pub mod solpat {
             cur_round.deposit_up += bet_amount;
             user_bet.bet_up += bet_amount;
         }
-        cur_round.accounts_amount += 1;
         user_bet.bet_time = ctx.accounts.clock.unix_timestamp;
         user_bet.is_active = true;
-        token::transfer(
-            ctx.accounts.into_transfer_context(),
-            bet_amount,
-        )?;
+        token::transfer(ctx.accounts.into_transfer_context(), bet_amount)?;
         emit!(DidBet {
+            round_id,
             user_pubkey: ctx.accounts.authority.key(),
-            bet_amount: bet_amount,
-            bet_type: bet_type,
+            bet_amount,
+            bet_type,
         });
         Ok(())
     }
 
-    pub fn claim(ctx: Context<Claim>) -> ProgramResult {
+    pub fn claim(ctx: Context<Claim>, round_id: u64) -> ProgramResult {
         let cur_round = &mut ctx.accounts.cur_round;
         let user_bet = &mut ctx.accounts.user_bet;
+        let bonus = (cur_round.deposit_down + cur_round.deposit_up)
+            * (10000 - ctx.accounts.pool.fee_rate)
+            / 10000;
         let amount = if cur_round.closed_price > cur_round.lock_price {
             if cur_round.deposit_up > 0 {
-                let amount = cur_round.bonus as u128 * user_bet.bet_up as u128 / cur_round.deposit_up as u128;
+                let amount = bonus as u128 * user_bet.bet_up as u128 / cur_round.deposit_up as u128;
                 amount as u64
             } else {
                 0
             }
         } else {
             if cur_round.deposit_down > 0 {
-                let amount = cur_round.bonus as u128 * user_bet.bet_down as u128 / cur_round.deposit_down as u128;
+                let amount =
+                    bonus as u128 * user_bet.bet_down as u128 / cur_round.deposit_down as u128;
                 amount as u64
             } else {
                 0
             }
         };
         user_bet.is_active = false;
-        cur_round.accounts_amount -= 1;
+        cur_round.take_amount += amount;
         if amount > 0 {
             let pool_id_bytes = ctx.accounts.pool.pool_id.to_be_bytes();
             let (_vault_authority, vault_authority_bump) =
@@ -190,15 +200,88 @@ pub mod solpat {
             )?;
         }
         emit!(DidClaim {
+            round_id,
             user_pubkey: ctx.accounts.authority.key(),
             claim_amount: amount,
         });
         Ok(())
     }
 
-    pub fn take_fee(ctx: Context<TakeFee>, _round_id: u64) -> ProgramResult {
+    pub fn claim_and_bet(
+        ctx: Context<ClaimAndBet>,
+        claim_round_id: u64,
+        bet_round_id: u64,
+        bet_amount: u64,
+        bet_type: u8,
+    ) -> ProgramResult {
+        let claim_round = &mut ctx.accounts.claim_round;
+        let claim_bet = &mut ctx.accounts.claim_bet;
+        let bonus = (claim_round.deposit_down + claim_round.deposit_up)
+            * (10000 - ctx.accounts.pool.fee_rate)
+            / 10000;
+        let amount = if claim_round.closed_price > claim_round.lock_price {
+            if claim_round.deposit_up > 0 {
+                let amount =
+                    bonus as u128 * claim_bet.bet_up as u128 / claim_round.deposit_up as u128;
+                amount as u64
+            } else {
+                0
+            }
+        } else {
+            if claim_round.deposit_down > 0 {
+                let amount =
+                    bonus as u128 * claim_bet.bet_down as u128 / claim_round.deposit_down as u128;
+                amount as u64
+            } else {
+                0
+            }
+        };
+        claim_bet.is_active = false;
+        claim_round.take_amount += amount;
+        if amount > 0 {
+            let pool_id_bytes = ctx.accounts.pool.pool_id.to_be_bytes();
+            let (_vault_authority, vault_authority_bump) =
+                Pubkey::find_program_address(&[pool_id_bytes.as_ref()], ctx.program_id);
+            let authority_seeds = [pool_id_bytes.as_ref(), &[vault_authority_bump]];
+            token::transfer(
+                ctx.accounts
+                    .into_claim_context()
+                    .with_signer(&[&authority_seeds]),
+                amount,
+            )?;
+        }
+        emit!(DidClaim {
+            round_id: claim_round_id,
+            user_pubkey: ctx.accounts.authority.key(),
+            claim_amount: amount,
+        });
+
+        // bet
+        let bet_round = &mut ctx.accounts.bet_round;
+        let user_bet = &mut ctx.accounts.user_bet;
+        if bet_type == 0 {
+            bet_round.deposit_down += bet_amount;
+            user_bet.bet_down += bet_amount;
+        } else {
+            bet_round.deposit_up += bet_amount;
+            user_bet.bet_up += bet_amount;
+        }
+        user_bet.bet_time = ctx.accounts.clock.unix_timestamp;
+        user_bet.is_active = true;
+        token::transfer(ctx.accounts.into_bet_context(), bet_amount)?;
+        emit!(DidBet {
+            round_id: bet_round_id,
+            user_pubkey: ctx.accounts.authority.key(),
+            bet_amount,
+            bet_type,
+        });
+        Ok(())
+    }
+
+    pub fn take_fee(ctx: Context<TakeFee>, round_id: u64) -> ProgramResult {
         let cur_round = &mut ctx.accounts.cur_round;
-        let amount = cur_round.deposit_down + cur_round.deposit_up - cur_round.bonus;
+        let amount =
+            (cur_round.deposit_down + cur_round.deposit_up) * ctx.accounts.pool.fee_rate / 10000;
         cur_round.status = 3;
         if amount > 0 {
             let pool_id_bytes = ctx.accounts.pool.pool_id.to_be_bytes();
@@ -213,6 +296,7 @@ pub mod solpat {
             )?;
         }
         emit!(DidTakeFee {
+            round_id,
             take_amount: amount,
         });
         Ok(())
@@ -230,7 +314,7 @@ pub mod solpat {
     pub fn free_round(ctx: Context<FreeRound>, _round_id: u64) -> ProgramResult {
         let cur_round = &mut ctx.accounts.cur_round;
         cur_round.status = 3;
-        let amount = ctx.accounts.token_vault.amount;
+        let amount = cur_round.deposit_down + cur_round.deposit_down - cur_round.take_amount;
         let pool_id_bytes = ctx.accounts.pool.pool_id.to_be_bytes();
         let (_vault_authority, vault_authority_bump) =
             Pubkey::find_program_address(&[pool_id_bytes.as_ref()], ctx.program_id);
@@ -243,11 +327,6 @@ pub mod solpat {
                 amount,
             )?;
         }
-        token::close_account(
-            ctx.accounts
-                .into_close_context()
-                .with_signer(&[&authority_seeds]),
-        )?;
         Ok(())
     }
 }
@@ -263,6 +342,15 @@ pub struct CreatePool<'info> {
         payer = authority,
     )]
     pub pool: Box<Account<'info, Pool>>,
+    #[account(
+        init,
+        seeds = [b"token", pool.key().as_ref()],
+        bump,
+        payer = authority,
+        token::mint = token_mint,
+        token::authority = pool,
+    )]
+    pub token_vault: Box<Account<'info, TokenAccount>>,
     pub feed_account: AccountInfo<'info>,
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
@@ -281,15 +369,6 @@ pub struct StartRound<'info> {
         has_one = token_mint
     )]
     pub pool: Account<'info, Pool>,
-    #[account(
-        init,
-        seeds = [b"token", next_round.key().as_ref()],
-        bump,
-        payer = authority,
-        token::mint = token_mint,
-        token::authority = pool,
-    )]
-    pub token_vault: Box<Account<'info, TokenAccount>>,
     #[account(
         init,
         seeds = [b"round", pool.key().as_ref(), pool.next_round.to_be_bytes().as_ref()],
@@ -316,15 +395,6 @@ pub struct LockRound<'info> {
         has_one = token_mint
     )]
     pub pool: Account<'info, Pool>,
-    #[account(
-        init,
-        seeds = [b"token", next_round.key().as_ref()],
-        bump,
-        payer = authority,
-        token::mint = token_mint,
-        token::authority = pool,
-    )]
-    pub token_vault: Box<Account<'info, TokenAccount>>,
     #[account(
         init,
         seeds = [b"round", pool.key().as_ref(), pool.next_round.to_be_bytes().as_ref()],
@@ -360,15 +430,6 @@ pub struct ProcessRound<'info> {
         has_one = token_mint
     )]
     pub pool: Account<'info, Pool>,
-    #[account(
-        init,
-        seeds = [b"token", next_round.key().as_ref()],
-        bump,
-        payer = authority,
-        token::mint = token_mint,
-        token::authority = pool,
-    )]
-    pub token_vault: Box<Account<'info, TokenAccount>>,
     #[account(
         init,
         seeds = [b"round", pool.key().as_ref(), pool.next_round.to_be_bytes().as_ref()],
@@ -453,12 +514,13 @@ pub struct CloseRound<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(bet_amount: u64)]
+#[instruction(bet_amount: u64, round_id: u64)]
 pub struct Bet<'info> {
     pub authority: Signer<'info>,
+    pub pool: Box<Account<'info, Pool>>,
     #[account(
         mut,
-        seeds = [b"token", cur_round.key().as_ref()],
+        seeds = [b"token", pool.key().as_ref()],
         bump,
     )]
     pub token_vault: Box<Account<'info, TokenAccount>>,
@@ -470,6 +532,8 @@ pub struct Bet<'info> {
     pub token_user: Box<Account<'info, TokenAccount>>,
     #[account(
         mut,
+        seeds = [b"round", pool.key().as_ref(), (round_id).to_be_bytes().as_ref()],
+        bump,
         constraint = cur_round.status == 0,
     )]
     pub cur_round: Box<Account<'info, Round>>,
@@ -487,9 +551,7 @@ pub struct Bet<'info> {
 }
 
 impl<'info> Bet<'info> {
-    fn into_transfer_context(
-        &self,
-    ) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
+    fn into_transfer_context(&self) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
         let cpi_accounts = Transfer {
             from: self.token_user.to_account_info(),
             to: self.token_vault.to_account_info(),
@@ -500,12 +562,13 @@ impl<'info> Bet<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(round_id: u64)]
 pub struct Claim<'info> {
     pub authority: Signer<'info>,
     pub pool: Box<Account<'info, Pool>>,
     #[account(
         mut,
-        seeds = [b"token", cur_round.key().as_ref()],
+        seeds = [b"token", pool.key().as_ref()],
         bump,
     )]
     pub token_vault: Box<Account<'info, TokenAccount>>,
@@ -513,6 +576,8 @@ pub struct Claim<'info> {
     pub token_user: Box<Account<'info, TokenAccount>>,
     #[account(
         mut,
+        seeds = [b"round", pool.key().as_ref(), (round_id).to_be_bytes().as_ref()],
+        bump,
         constraint = cur_round.status >= 2,
     )]
     pub cur_round: Box<Account<'info, Round>>,
@@ -526,13 +591,11 @@ pub struct Claim<'info> {
     pub user_bet: Box<Account<'info, UserBet>>,
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
-    pub rent: Sysvar<'info, Rent>
+    pub rent: Sysvar<'info, Rent>,
 }
 
 impl<'info> Claim<'info> {
-    fn into_transfer_context(
-        &self,
-    ) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
+    fn into_transfer_context(&self) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
         let cpi_accounts = Transfer {
             from: self.token_vault.to_account_info(),
             to: self.token_user.to_account_info(),
@@ -543,12 +606,84 @@ impl<'info> Claim<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(_round_id: u64)]
+#[instruction(bet_amount: u64, claim_round_id: u64, bet_round_id: u64)]
+pub struct ClaimAndBet<'info> {
+    pub authority: Signer<'info>,
+    pub pool: Box<Account<'info, Pool>>,
+    #[account(
+        mut,
+        seeds = [b"token", pool.key().as_ref()],
+        bump,
+    )]
+    pub token_vault: Box<Account<'info, TokenAccount>>,
+    #[account(
+        mut,
+        constraint = bet_amount > 0,
+        constraint = token_user.amount >= bet_amount
+    )]
+    pub token_user: Box<Account<'info, TokenAccount>>,
+    #[account(
+        mut,
+        seeds = [b"round", pool.key().as_ref(), (claim_round_id).to_be_bytes().as_ref()],
+        bump,
+        constraint = claim_round.status >= 2,
+    )]
+    pub claim_round: Box<Account<'info, Round>>,
+    #[account(
+        mut,
+        seeds = [b"bet", claim_round.key().as_ref(), authority.key().as_ref()],
+        bump,
+        constraint = claim_bet.is_active,
+        close = authority
+    )]
+    pub claim_bet: Box<Account<'info, UserBet>>,
+    #[account(
+        mut,
+        seeds = [b"round", pool.key().as_ref(), bet_round_id.to_be_bytes().as_ref()],
+        bump,
+        constraint = bet_round.status == 0,
+    )]
+    pub bet_round: Box<Account<'info, Round>>,
+    #[account(
+        init_if_needed,
+        seeds = [b"bet", bet_round.key().as_ref(), authority.key().as_ref()],
+        bump,
+        payer = authority,
+    )]
+    pub user_bet: Box<Account<'info, UserBet>>,
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
+    pub rent: Sysvar<'info, Rent>,
+    pub clock: Sysvar<'info, Clock>,
+}
+
+impl<'info> ClaimAndBet<'info> {
+    fn into_bet_context(&self) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
+        let cpi_accounts = Transfer {
+            from: self.token_user.to_account_info(),
+            to: self.token_vault.to_account_info(),
+            authority: self.authority.to_account_info(),
+        };
+        CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
+    }
+
+    fn into_claim_context(&self) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
+        let cpi_accounts = Transfer {
+            from: self.token_vault.to_account_info(),
+            to: self.token_user.to_account_info(),
+            authority: self.pool.to_account_info(),
+        };
+        CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
+    }
+}
+
+#[derive(Accounts)]
+#[instruction(round_id: u64)]
 pub struct TakeFee<'info> {
     pub authority: Signer<'info>,
     #[account(
         mut,
-        seeds = [b"token", cur_round.key().as_ref()],
+        seeds = [b"token", pool.key().as_ref()],
         bump,
     )]
     pub token_vault: Box<Account<'info, TokenAccount>>,
@@ -556,10 +691,9 @@ pub struct TakeFee<'info> {
     pub token_user: Box<Account<'info, TokenAccount>>,
     #[account(
         mut,
-        seeds = [b"round", pool.key().as_ref(), _round_id.to_be_bytes().as_ref()],
+        seeds = [b"round", pool.key().as_ref(), round_id.to_be_bytes().as_ref()],
         bump,
         constraint = cur_round.status == 2,
-        constraint = cur_round.bonus > 0,
     )]
     pub cur_round: Box<Account<'info, Round>>,
     #[account(
@@ -568,13 +702,11 @@ pub struct TakeFee<'info> {
     pub pool: Account<'info, Pool>,
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
-    pub rent: Sysvar<'info, Rent>
+    pub rent: Sysvar<'info, Rent>,
 }
 
 impl<'info> TakeFee<'info> {
-    fn into_transfer_context(
-        &self,
-    ) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
+    fn into_transfer_context(&self) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
         let cpi_accounts = Transfer {
             from: self.token_vault.to_account_info(),
             to: self.token_user.to_account_info(),
@@ -603,7 +735,7 @@ pub struct FreeRound<'info> {
     pub authority: Signer<'info>,
     #[account(
         mut,
-        seeds = [b"token", cur_round.key().as_ref()],
+        seeds = [b"token", pool.key().as_ref()],
         bump,
     )]
     pub token_vault: Box<Account<'info, TokenAccount>>,
@@ -614,7 +746,7 @@ pub struct FreeRound<'info> {
         seeds = [b"round", pool.key().as_ref(), _round_id.to_be_bytes().as_ref()],
         bump,
         constraint = cur_round.status >= 2,
-        constraint = cur_round.accounts_amount == 0,
+        constraint = (cur_round.take_amount + 5000 > (cur_round.deposit_up + cur_round.deposit_down)) || cur_round.start_time + 15552000 <= clock.unix_timestamp,
         close = authority
     )]
     pub cur_round: Box<Account<'info, Round>>,
@@ -624,25 +756,15 @@ pub struct FreeRound<'info> {
     pub pool: Account<'info, Pool>,
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
-    pub rent: Sysvar<'info, Rent>
+    pub rent: Sysvar<'info, Rent>,
+    pub clock: Sysvar<'info, Clock>,
 }
 
 impl<'info> FreeRound<'info> {
-    fn into_transfer_context(
-        &self,
-    ) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
+    fn into_transfer_context(&self) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
         let cpi_accounts = Transfer {
             from: self.token_vault.to_account_info(),
             to: self.token_user.to_account_info(),
-            authority: self.pool.to_account_info(),
-        };
-        CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
-    }
-
-    fn into_close_context(&self) -> CpiContext<'_, '_, '_, 'info, CloseAccount<'info>> {
-        let cpi_accounts = CloseAccount {
-            account: self.token_vault.to_account_info(),
-            destination: self.authority.to_account_info(),
             authority: self.pool.to_account_info(),
         };
         CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
@@ -670,18 +792,15 @@ pub struct Pool {
 #[account]
 #[derive(Default)]
 pub struct Round {
-    // bonus = deposit_up + deposit_down - fee
-    pub bonus: u64,
     pub start_time: i64,
     pub lock_time: i64,
-    pub closed_time: i64,
     pub deposit_up: u64,
     pub deposit_down: u64,
-    pub accounts_amount: u64,
+    pub take_amount: u64,
     pub lock_price: i64,
     pub closed_price: i64,
     // 0: active, 1: locked, 2: closed, 3: fee taked
-    pub status: u8
+    pub status: u8,
 }
 
 #[account]
@@ -715,6 +834,7 @@ pub struct DidProcessRound {
 
 #[event]
 pub struct DidBet {
+    round_id: u64,
     user_pubkey: Pubkey,
     bet_amount: u64,
     bet_type: u8,
@@ -722,11 +842,13 @@ pub struct DidBet {
 
 #[event]
 pub struct DidClaim {
+    round_id: u64,
     user_pubkey: Pubkey,
     claim_amount: u64,
 }
 
 #[event]
 pub struct DidTakeFee {
+    round_id: u64,
     take_amount: u64,
 }
