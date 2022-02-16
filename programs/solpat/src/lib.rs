@@ -41,6 +41,7 @@ pub mod solpat {
         emit!(DidStartRound {
             start_time: now_ts,
             round_id: pool.next_round - 1,
+            pool_id: pool.pool_id,
         });
         Ok(())
     }
@@ -71,6 +72,7 @@ pub mod solpat {
             lock_time: now_ts,
             lock_price: price,
             round_id: pool.next_round - 1,
+            pool_id: pool.pool_id,
         });
         Ok(())
     }
@@ -105,6 +107,7 @@ pub mod solpat {
             lock_time: now_ts,
             lock_price: price,
             round_id: pool.next_round - 1,
+            pool_id: pool.pool_id,
         });
         Ok(())
     }
@@ -155,6 +158,7 @@ pub mod solpat {
         user_bet.is_active = true;
         token::transfer(ctx.accounts.into_transfer_context(), bet_amount)?;
         emit!(DidBet {
+            pool_id: ctx.accounts.pool.pool_id,
             round_id,
             user_pubkey: ctx.accounts.authority.key(),
             bet_amount,
@@ -166,6 +170,7 @@ pub mod solpat {
     pub fn claim(ctx: Context<Claim>, round_id: u64) -> ProgramResult {
         let cur_round = &mut ctx.accounts.cur_round;
         let user_bet = &mut ctx.accounts.user_bet;
+        let pool_id = ctx.accounts.pool.pool_id;
         let bonus = (cur_round.deposit_down + cur_round.deposit_up)
             * (10000 - ctx.accounts.pool.fee_rate)
             / 10000;
@@ -188,7 +193,7 @@ pub mod solpat {
         user_bet.is_active = false;
         cur_round.take_amount += amount;
         if amount > 0 {
-            let pool_id_bytes = ctx.accounts.pool.pool_id.to_be_bytes();
+            let pool_id_bytes = pool_id.to_be_bytes();
             let (_vault_authority, vault_authority_bump) =
                 Pubkey::find_program_address(&[pool_id_bytes.as_ref()], ctx.program_id);
             let authority_seeds = [pool_id_bytes.as_ref(), &[vault_authority_bump]];
@@ -200,6 +205,7 @@ pub mod solpat {
             )?;
         }
         emit!(DidClaim {
+            pool_id,
             round_id,
             user_pubkey: ctx.accounts.authority.key(),
             claim_amount: amount,
@@ -216,6 +222,7 @@ pub mod solpat {
     ) -> ProgramResult {
         let claim_round = &mut ctx.accounts.claim_round;
         let claim_bet = &mut ctx.accounts.claim_bet;
+        let pool_id = ctx.accounts.pool.pool_id;
         let bonus = (claim_round.deposit_down + claim_round.deposit_up)
             * (10000 - ctx.accounts.pool.fee_rate)
             / 10000;
@@ -239,7 +246,7 @@ pub mod solpat {
         claim_bet.is_active = false;
         claim_round.take_amount += amount;
         if amount > 0 {
-            let pool_id_bytes = ctx.accounts.pool.pool_id.to_be_bytes();
+            let pool_id_bytes = pool_id.to_be_bytes();
             let (_vault_authority, vault_authority_bump) =
                 Pubkey::find_program_address(&[pool_id_bytes.as_ref()], ctx.program_id);
             let authority_seeds = [pool_id_bytes.as_ref(), &[vault_authority_bump]];
@@ -251,6 +258,7 @@ pub mod solpat {
             )?;
         }
         emit!(DidClaim {
+            pool_id,
             round_id: claim_round_id,
             user_pubkey: ctx.accounts.authority.key(),
             claim_amount: amount,
@@ -270,6 +278,7 @@ pub mod solpat {
         user_bet.is_active = true;
         token::transfer(ctx.accounts.into_bet_context(), bet_amount)?;
         emit!(DidBet {
+            pool_id,
             round_id: bet_round_id,
             user_pubkey: ctx.accounts.authority.key(),
             bet_amount,
@@ -280,11 +289,12 @@ pub mod solpat {
 
     pub fn take_fee(ctx: Context<TakeFee>, round_id: u64) -> ProgramResult {
         let cur_round = &mut ctx.accounts.cur_round;
+        let pool_id = ctx.accounts.pool.pool_id;
         let amount =
             (cur_round.deposit_down + cur_round.deposit_up) * ctx.accounts.pool.fee_rate / 10000;
         cur_round.status = 3;
         if amount > 0 {
-            let pool_id_bytes = ctx.accounts.pool.pool_id.to_be_bytes();
+            let pool_id_bytes = pool_id.to_be_bytes();
             let (_vault_authority, vault_authority_bump) =
                 Pubkey::find_program_address(&[pool_id_bytes.as_ref()], ctx.program_id);
             let authority_seeds = [pool_id_bytes.as_ref(), &[vault_authority_bump]];
@@ -296,6 +306,7 @@ pub mod solpat {
             )?;
         }
         emit!(DidTakeFee {
+            pool_id,
             round_id,
             take_amount: amount,
         });
@@ -816,6 +827,7 @@ pub struct UserBet {
 pub struct DidStartRound {
     start_time: i64,
     round_id: u64,
+    pool_id: u64,
 }
 
 #[event]
@@ -823,6 +835,7 @@ pub struct DidLockRound {
     lock_time: i64,
     lock_price: i64,
     round_id: u64,
+    pool_id: u64,
 }
 
 #[event]
@@ -830,10 +843,12 @@ pub struct DidProcessRound {
     lock_time: i64,
     lock_price: i64,
     round_id: u64,
+    pool_id: u64,
 }
 
 #[event]
 pub struct DidBet {
+    pool_id: u64,
     round_id: u64,
     user_pubkey: Pubkey,
     bet_amount: u64,
@@ -842,6 +857,7 @@ pub struct DidBet {
 
 #[event]
 pub struct DidClaim {
+    pool_id: u64,
     round_id: u64,
     user_pubkey: Pubkey,
     claim_amount: u64,
@@ -849,6 +865,7 @@ pub struct DidClaim {
 
 #[event]
 pub struct DidTakeFee {
+    pool_id: u64,
     round_id: u64,
     take_amount: u64,
 }
