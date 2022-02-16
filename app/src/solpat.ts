@@ -84,7 +84,7 @@ async function createPool() {
   );
   return "OK";
 }
-
+/*
 async function startRound() {
   const [_pool_account_pda, _pool_account_bump] = await PublicKey.findProgramAddress(
     [pool_id.toBuffer("be", 8)],
@@ -390,13 +390,13 @@ async function freeRound(round_id) {
   console.log("Your transaction signature", tx);
   return "OK";
 }
-
+*/
 createPool().then(console.log);
-startRound().then(console.log);
-betRound().then(console.log);
-lockRound().then(console.log);
-processRound().then(console.log);
-claimRound().then(console.log);
-takeFeeRound().then(console.log);
-processRound().then(console.log);
-freeRound().then(console.log);
+// startRound().then(console.log);
+// betRound().then(console.log);
+// lockRound().then(console.log);
+// processRound().then(console.log);
+// claimRound().then(console.log);
+// takeFeeRound().then(console.log);
+// processRound().then(console.log);
+// freeRound().then(console.log);

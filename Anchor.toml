@@ -1,11 +1,11 @@
 [programs.devnet]
-solpat = "Predi95J5ikTsG1v1ccrg8eDBUQaUr5Nkw7X4U5Fzbi"
+solpat = "PrediCRGdC1S7TwJWrLbZtcv3qLm3AeQHZ8c4vFpWd9"
 
 [programs.testnet]
-solpat = "Predi95J5ikTsG1v1ccrg8eDBUQaUr5Nkw7X4U5Fzbi"
+solpat = "PrediCRGdC1S7TwJWrLbZtcv3qLm3AeQHZ8c4vFpWd9"
 
 [programs.mainnet]
-solpat = "Predi95J5ikTsG1v1ccrg8eDBUQaUr5Nkw7X4U5Fzbi"
+solpat = "PrediCRGdC1S7TwJWrLbZtcv3qLm3AeQHZ8c4vFpWd9"
 
 [registry]
 url = "https://anchor.projectserum.com"
