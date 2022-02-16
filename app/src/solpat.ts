@@ -2,17 +2,19 @@
 // export ANCHOR_PROVIDER_URL="https://api.devnet.solana.com"
 import * as anchor from '@project-serum/anchor';
 import { Program } from '@project-serum/anchor';
-import { Solpat } from '../../target/types/solpat';
 import { TOKEN_PROGRAM_ID, Token } from '@solana/spl-token';
 // import NodeWallet from '@project-serum/anchor/dist/cjs/provider';
 import { PublicKey, Keypair, clusterApiUrl, SystemProgram, Transaction, Connection, Commitment } from '@solana/web3.js';
-// import idl from './idl.json';
+
 const idl = require('./idl.json');
+const programID = new PublicKey("PrediCRGdC1S7TwJWrLbZtcv3qLm3AeQHZ8c4vFpWd9");
+const provider = anchor.Provider.env();
+anchor.setProvider(provider);
+const wallet = provider.wallet;
+const program = new Program(idl, programID, provider);
 
 const assert = require("assert");
 const fs = require('fs');
-const programID = new PublicKey(idl.metadata.address);
-const options = anchor.Provider.defaultOptions();
 
 function getKeypair() {
   let data = fs.readFileSync('/home/ke/.config/solana/id.json', 'utf8');
@@ -28,19 +30,6 @@ const myMintAccount = "DCWj38SJkuZfy4UZDJkHsCEXZbJ3xBHQetw4oTX7z2uz";
 const myMintPublickey = new PublicKey(myMintAccount);
 const tokenUserAccount = "CMcmPxyd2m92f2GAUea1zTkparTZZQzkz8Fn2JFoAozB";
 const token_user = new PublicKey(tokenUserAccount);
-// Configure the client to use the local cluster.
-// const connection = new Connection(clusterApiUrl("devnet"));
-// const wallet = anchor.Provider.env();
-
-// const provider = new anchor.Provider(connection, wallet, options);
-// anchor.setProvider(provider);
-// anchor.setProvider(anchor.Provider.env());
-const provider = anchor.Provider.env();
-anchor.setProvider(provider);
-// anchor.setProvider(anchor.Provider.env());
-
-const program = anchor.workspace.Solpat as Program<Solpat>;
-const wallet = program.provider.wallet;
 
 let pool_id = new anchor.BN(7);
 
@@ -65,7 +54,7 @@ async function createPool() {
       accounts: {
         authority: wallet.publicKey,
         pool: pool_account_pda,
-        token_vault: token_vault_pda,
+        tokenVault: token_vault_pda,
         feedAccount: AggregatorPublicKey,
         systemProgram: anchor.web3.SystemProgram.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
