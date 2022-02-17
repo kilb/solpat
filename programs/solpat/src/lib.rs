@@ -322,7 +322,7 @@ pub mod solpat {
         Ok(())
     }
 
-    pub fn free_round(ctx: Context<FreeRound>, _round_id: u64) -> ProgramResult {
+    pub fn free_round(ctx: Context<FreeRound>, round_id: u64) -> ProgramResult {
         let cur_round = &mut ctx.accounts.cur_round;
         cur_round.status = 3;
         let amount = cur_round.deposit_down + cur_round.deposit_down - cur_round.take_amount;
@@ -338,6 +338,11 @@ pub mod solpat {
                 amount,
             )?;
         }
+        emit!(DidFreeRound {
+            pool_id: ctx.accounts.pool.pool_id,
+            round_id,
+            remain_amount: amount,
+        });
         Ok(())
     }
 }
@@ -741,7 +746,7 @@ pub struct UpdatePool<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(_round_id: u64)]
+#[instruction(round_id: u64)]
 pub struct FreeRound<'info> {
     pub authority: Signer<'info>,
     #[account(
@@ -754,7 +759,7 @@ pub struct FreeRound<'info> {
     pub token_user: Box<Account<'info, TokenAccount>>,
     #[account(
         mut,
-        seeds = [b"round", pool.key().as_ref(), _round_id.to_be_bytes().as_ref()],
+        seeds = [b"round", pool.key().as_ref(), round_id.to_be_bytes().as_ref()],
         bump,
         constraint = cur_round.status >= 2,
         constraint = (cur_round.take_amount + 5000 > (cur_round.deposit_up + cur_round.deposit_down)) || cur_round.start_time + 15552000 <= clock.unix_timestamp,
@@ -868,4 +873,11 @@ pub struct DidTakeFee {
     pool_id: u64,
     round_id: u64,
     take_amount: u64,
+}
+
+#[event]
+pub struct DidFreeRound {
+    pool_id: u64,
+    round_id: u64,
+    remain_amount: u64,
 }

@@ -42,7 +42,7 @@ async function betRound(flag: number, amount: number, round: anchor.BN) {
   );
 
   const [token_vault_pda, _token_vault_bump] = await PublicKey.findProgramAddress(
-    [Buffer.from(anchor.utils.bytes.utf8.encode("token")), cur_round_pda.toBuffer()],
+    [Buffer.from(anchor.utils.bytes.utf8.encode("token")), pool_account_pda.toBuffer()],
     program.programId
   );
 
@@ -53,6 +53,7 @@ async function betRound(flag: number, amount: number, round: anchor.BN) {
 
   const tx = await program.rpc.bet(
     new anchor.BN(amount), // bet amount
+    round,
     flag,
     {
       accounts: {
@@ -77,7 +78,7 @@ async function claimRound(round: anchor.BN) {
   );
 
   const [token_vault_pda, _token_vault_bump] = await PublicKey.findProgramAddress(
-    [Buffer.from(anchor.utils.bytes.utf8.encode("token")), claim_round_pda.toBuffer()],
+    [Buffer.from(anchor.utils.bytes.utf8.encode("token")), pool_account_pda.toBuffer()],
     program.programId
   );
 
@@ -87,6 +88,7 @@ async function claimRound(round: anchor.BN) {
   );
 
   const tx = await program.rpc.claim(
+    round,
     {
       accounts: {
         authority: wallet.publicKey,
@@ -114,14 +116,6 @@ function getRandomInt(min, max) {
   max = Math.floor(max);
   return Math.floor(Math.random() * (max - min)) + min; //The maximum is exclusive and the minimum is inclusive
 }
-
-// process.on('uncaughtException', (err, origin) => {
-//   console.log(
-//     process.stderr.fd,
-//     `Caught exception: ${err}\n` +
-//     `Exception origin: ${origin}`
-//   );
-// });
 
 (async () => {
   await init().then(console.log);
