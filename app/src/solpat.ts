@@ -346,7 +346,7 @@ async function claimAndBet(claim_round_id, bet_round_id, bet_amount, bet_type) {
         tokenVault: token_vault_pda,
         tokenUser: token_user,
         claimRound: claim_round_pda,
-        claimBet: user_bet_pda,
+        claimBet: claim_bet_pda,
         betRound: bet_round_pda,
         userBet: user_bet_pda,
         systemProgram: anchor.web3.SystemProgram.programId,

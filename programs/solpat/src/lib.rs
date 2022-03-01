@@ -622,7 +622,7 @@ impl<'info> Claim<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(bet_amount: u64, claim_round_id: u64, bet_round_id: u64)]
+#[instruction(claim_round_id: u64, bet_round_id: u64, bet_amount: u64)]
 pub struct ClaimAndBet<'info> {
     pub authority: Signer<'info>,
     pub pool: Box<Account<'info, Pool>>,
