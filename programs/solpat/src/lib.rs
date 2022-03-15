@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 use pyth_client::load_price;
 
-declare_id!("PrediCRGdC1S7TwJWrLbZtcv3qLm3AeQHZ8c4vFpWd9");
+declare_id!("Predic8479Ssae5ef1fiG84D58VpTEWeE1dvJh3LE2c");
 
 #[program]
 pub mod solpat {
